@@ -359,6 +359,13 @@ def wrapped_ferret_request(request_slice, https_endpoint):
         # we'll consider it failed
         response.raise_for_status()
 
+        if not response:
+            raise RuntimeError("No response obtained from HTTP endpoint")
+
+        # If the request is unsuccessful (e.g. has a non 2xx response code),
+        # we'll consider it failed
+        response.raise_for_status()
+
     return response
 
 

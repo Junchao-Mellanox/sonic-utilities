@@ -9,6 +9,7 @@ import re
 import subprocess
 import sys
 import ipaddress
+import ipaddr
 
 import click
 from click_default_group import DefaultGroup
@@ -1669,6 +1670,20 @@ def ssdhealth(device, verbose, vendor):
     options = " -v" if verbose else ""
     options += " -e" if vendor else ""
     run_command(cmd + options, display_cmd=verbose)
+
+# 'fan' subcommand ("show platform fan")
+@platform.command()
+def fan():
+    """Show fan status information"""
+    cmd = 'fanshow'
+    run_command(cmd)
+
+# 'temperature' subcommand ("show platform temperature")
+@platform.command()
+def temperature():
+    """Show device temperature information"""
+    cmd = 'tempershow'
+    run_command(cmd)
 
 #
 # 'logging' command ("show logging")

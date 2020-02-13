@@ -57,6 +57,9 @@
   * [Reloading Configuration](#reloading-configuration)
   * [Loading Management Configuration](#loading-management-configuration)
   * [Saving Configuration to a File for Persistence](saving-configuration-to-a-file-for-persistence)
+* [Management VRF](#Management-VRF)
+  * [Management VRF Show commands](#management-vrf-show-commands)
+  * [Management VRF Config commands](#management-vrf-config-commands)
 * [Mirroring](#mirroring)
   * [Mirroring Show commands](#mirroring-show-commands)
   * [Mirroring Config commands](#mirroring-config-commands)
@@ -187,16 +190,16 @@ Go Back To [Beginning of the document](#) or [Beginning of this section](#basic-
 The management interface (eth0) in SONiC is configured (by default) to use DHCP client to get the IP address from the DHCP server. Connect the management interface to the same network in which your DHCP server is connected and get the IP address from DHCP server.
 The IP address received from DHCP server can be verified using the `/sbin/ifconfig eth0` Linux command.
 
-SONiC does not provide a CLI to configure the static IP for the management interface. There are few alternate ways by which a static IP address can be configured for the management interface.
-  1. Use the `/sbin/ifconfig eth0 ...` Linux command. NOTE: This configuration **will not** be preserved across reboots.
+SONiC provides a CLI to configure the static IP for the management interface. There are few ways by which a static IP address can be configured for the management interface.
+  1. Use the `config interface ip add eth0` command.
   - Example:
   ```
-  admin@sonic:~$ /sbin/ifconfig eth0 10.11.12.13/24
+  admin@sonic:~$ sudo config interface ip add eth0 20.11.12.13/24 20.11.12.254
   ```
   2. Use config_db.json and configure the MGMT_INTERFACE key with the appropriate values. Refer [here](https://github.com/Azure/SONiC/wiki/Configuration#Management-Interface)
   3. Use minigraph.xml and configure "ManagementIPInterfaces" tag inside "DpgDesc" tag as given at the [page](https://github.com/Azure/SONiC/wiki/Configuration-with-Minigraph-(~Sep-2017))
 
-Once the IP address is configured, the same can be verified using "/sbin/ifconfig eth0" linux command.
+Once the IP address is configured, the same can be verified using either `show management_interface address` command or the `/sbin/ifconfig eth0` linux command.
 Users can SSH login to this management interface IP address from their management network.
 
 - Example:
@@ -2076,13 +2079,13 @@ Subsequent pages explain each of these commands in detail.
 
 **show interfaces counters**
 
-This show command displays packet counters for all interfaces since the last time the counters were cleared. There is no facility to display counters for one specific interface. Optional argument "-a" does not have any significance in this command.
-Optional argument "-c" can be used to clear the counters for all interfaces.
+This show command displays packet counters for all interfaces since the last time the counters were cleared. To display l3 counters "rif" subcommand can be used. There is no facility to display counters for one specific l2 interface. For l3 interfaces a single interface output mode is present. Optional argument "-a" provides two additional columns - RX-PPS and TX_PPS.
 Optional argument "-p" specify a period (in seconds) with which to gather counters over.
 
 - Usage:
   ```
   show interfaces counters [-a|--printall] [-p|--period <period>]
+  show interfaces counters rif [-p|--period <period>] <interface_name>
   ```
 
 - Example:
@@ -2099,10 +2102,49 @@ Optional argument "-p" specify a period (in seconds) with which to gather counte
    Ethernet24        U   33,543,533,441   36.59 MB/s      0.71%         0     1,613         0   43,066,076,370   49.92 MB/s      0.97%         0         0         0
   ```
 
+The "rif" subcommand is used to display l3 interface counters. Layer 3 interfaces include router interfaces, portchannels and vlan interfaces.
+
+- Example:
+
+```
+  admin@sonic:~$ show interfaces counters rif
+          IFACE    RX_OK      RX_BPS    RX_PPS    RX_ERR    TX_OK    TX_BPS    TX_PPS    TX_ERR
+---------------  -------  ----------  --------  --------  -------  --------  --------  --------
+PortChannel0001   62,668  107.81 B/s    1.34/s         3        6  0.02 B/s    0.00/s         0
+PortChannel0002   62,645  107.77 B/s    1.34/s         3        2  0.01 B/s    0.00/s         0
+PortChannel0003   62,481  107.56 B/s    1.34/s         3        3  0.01 B/s    0.00/s         0
+PortChannel0004   62,732  107.88 B/s    1.34/s         2        3  0.01 B/s    0.00/s         0
+       Vlan1000        0    0.00 B/s    0.00/s         0        0  0.00 B/s    0.00/s         0
+```
+
+
+Optionally, you can specify a layer 3 interface name to display the counters in single interface mode.
+
+- Example:
+
+```
+  admin@sonic:~$ show interfaces counters rif PortChannel0001
+  PortChannel0001
+  ---------------
+
+          RX:
+                3269 packets
+              778494 bytesq
+                   3 error packets
+                 292 error bytes
+          TX:
+                   0 packets
+                   0 bytes
+                   0 error packets
+                   0 error bytes
+```
+
+
 Optionally, you can specify a period (in seconds) with which to gather counters over. Note that this function will take `<period>` seconds to execute.
 
 - Example:
-  ```
+
+```
   admin@sonic:~$ show interfaces counters -p 5
         IFACE    STATE    RX_OK       RX_BPS    RX_UTIL    RX_ERR    RX_DRP    RX_OVR    TX_OK       TX_BPS    TX_UTIL    TX_ERR    TX_DRP    TX_OVR
   -----------  -------  -------  -----------  ---------  --------  --------  --------  -------  -----------  ---------  --------  --------  --------
@@ -2113,11 +2155,18 @@ Optionally, you can specify a period (in seconds) with which to gather counters 
   Ethernet16        U      377   32.64 KB/s      0.00%         0         0         0      214   18.01 KB/s      0.00%         0         0         0
   Ethernet20        U      284   36.81 KB/s      0.00%         0         0         0      138  8758.25 B/s      0.00%         0         0         0
   Ethernet24        U      173   16.09 KB/s      0.00%         0         0         0      169   11.39 KB/s      0.00%         0         0         0
-  ```
+```
 
 - NOTE: Interface counters can be cleared by the user with the following command:
+
   ```
   root@sonic:~# sonic-clear counters
+  ```
+
+- NOTE: Layer 3 interface counters can be cleared by the user with the following command:
+
+  ```
+  root@sonic:~# sonic-clear rifcounters
   ```
 
 **show interfaces description**
@@ -2252,12 +2301,13 @@ The syntax for all such interface_subcommands are given below under each command
 NOTE: In older versions of SONiC until 201811 release, the command syntax was `config interface <interface_name> interface_subcommand`
 
 
-**config interface ip add <interface_name> <ip_addr> (Versions >= 201904)**
+**config interface ip add <interface_name> <ip_addr> [default_gw] (Versions >= 201904)**
 
 **config interface <interface_name> ip add <ip_addr> (Versions <= 201811)**
 
 This command is used for adding the IP address for an interface.
-IP address for either physical interface or for portchannel or for VLAN interface can be configured using this command.
+IP address for either physical interface or for portchannel or for VLAN interface can be configured using this command. 
+While configuring the IP address for the management interface "eth0", users can provide the default gateway IP address as an optional parameter from release 201911. 
 
 
 - Usage:
@@ -2276,6 +2326,7 @@ IP address for either physical interface or for portchannel or for VLAN interfac
   *Versions >= 201904*
   ```
   admin@sonic:~$ sudo config interface ip add Ethernet63 10.11.12.13/24
+  admin@sonic:~$ sudo config interface ip add eth0 20.11.12.13/24 20.11.12.254
   ```
   *Versions <= 201811*
   ```
@@ -2316,6 +2367,7 @@ VLAN interface names take the form of `vlan<vlan_id>`. E.g., VLAN 100 will be na
   *Versions >= 201904*
   ```
   admin@sonic:~$ sudo config interface ip remove Ethernet63 10.11.12.13/24
+  admin@sonic:~$ sudo config interface ip remove eth0 20.11.12.13/24
   ```
   *Versions <= 201811*
   ```
@@ -3007,6 +3059,213 @@ Saved file can be transferred to remote machines for debugging. If users wants t
   ```
 
 Go Back To [Beginning of the document](#) or [Beginning of this section](#loading-reloading-and-saving-configuration)
+
+
+## Management VRF
+
+### Management VRF Show commands
+
+**show mgmt-vrf**
+
+This command displays whether the management VRF is enabled or disabled. It also displays the details about the the links (eth0, mgmt, lo-m) that are related to management VRF. 
+
+- Usage:
+  ```
+  show mgmt-vrf
+  ```
+
+- Example:
+  ```
+    root@sonic:/etc/init.d# show mgmt-vrf 
+
+    ManagementVRF : Enabled
+
+    Management VRF interfaces in Linux:
+    348: mgmt: <NOARP,MASTER,UP,LOWER_UP> mtu 65536 qdisc noqueue state UP mode DEFAULT group default qlen 1000
+        link/ether f2:2a:d9:bc:e8:f0 brd ff:ff:ff:ff:ff:ff
+    2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq master mgmt state UP mode DEFAULT group default qlen 1000
+        link/ether 4c:76:25:f4:f9:f3 brd ff:ff:ff:ff:ff:ff
+    350: lo-m: <BROADCAST,NOARP,UP,LOWER_UP> mtu 1500 qdisc noqueue master mgmt state UNKNOWN mode DEFAULT group default qlen 1000
+        link/ether b2:4c:c6:f3:e9:92 brd ff:ff:ff:ff:ff:ff
+
+    NOTE: The management interface "eth0" shows the "master" as "mgmt" since it is part of management VRF.
+  ```
+
+**show mgmt-vrf routes**
+
+This command displays the routes that are present in the routing table 5000 that is meant for management VRF.
+
+- Usage:
+  ```
+  show mgmt-vrf routes
+  ```
+
+- Example:
+  ```
+    root@sonic:/etc/init.d# show mgmt-vrf routes
+    
+    Routes in Management VRF Routing Table:
+    default via 10.16.210.254 dev eth0 metric 201 
+    broadcast 10.16.210.0 dev eth0 proto kernel scope link src 10.16.210.75 
+    10.16.210.0/24 dev eth0 proto kernel scope link src 10.16.210.75 
+    local 10.16.210.75 dev eth0 proto kernel scope host src 10.16.210.75 
+    broadcast 10.16.210.255 dev eth0 proto kernel scope link src 10.16.210.75 
+    broadcast 127.0.0.0 dev lo-m proto kernel scope link src 127.0.0.1 
+    127.0.0.0/8 dev lo-m proto kernel scope link src 127.0.0.1 
+    local 127.0.0.1 dev lo-m proto kernel scope host src 127.0.0.1 
+    broadcast 127.255.255.255 dev lo-m proto kernel scope link src 127.0.0.1 
+  ```
+
+**show management_interface address**
+
+This command displays the IP address(es) configured for the management interface "eth0" and the management network default gateway.
+
+- Usage:
+  ```
+  show management_interface address
+  ```
+
+- Example:
+  ```
+    root@sonic:/etc/init.d# show management_interface address 
+    Management IP address = 10.16.210.75/24
+    Management NetWork Default Gateway = 10.16.210.254
+    Management IP address = FC00:2::32/64
+    Management Network Default Gateway = fc00:2::1
+  ```
+
+**show snmpagentaddress**
+
+This command displays the configured SNMP agent IP addresses.
+
+- Usage:
+  ```
+  show snmpagentaddress
+  ```
+
+- Example:
+  ```
+    root@sonic-s6100-07:~# show snmpagentaddress 
+    ListenIP      ListenPort  ListenVrf
+    ----------  ------------  -----------
+    1.2.3.4              787  mgmt
+  ```
+
+**show snmptrap**
+
+This command displays the configured SNMP Trap server IP addresses.
+
+- Usage:
+  ```
+  show snmptrap
+  ```
+
+- Example:
+  ```
+    root@sonic-s6100-07:~# show snmptrap 
+      Version  TrapReceiverIP      Port  VRF    Community
+    ---------  ----------------  ------  -----  -----------
+            2  31.31.31.31          456  mgmt   public
+  ```
+
+### Management VRF Config commands
+
+**config vrf add mgmt**
+
+This command enables the management VRF in the system. This command restarts the "interfaces-config" service which in turn regenerates the /etc/network/interfaces file and restarts the "networking" service. This creates a new interface and l3mdev CGROUP with the name as "mgmt" and enslaves the management interface "eth0" into this master interface "mgmt". Note that the VRFName "mgmt" (or "management") is reserved for management VRF. i.e. Data VRFs should not use these reserved VRF names.
+
+- Usage:
+  ```
+  config vrf add mgmt
+  ```
+
+- Example:
+  ```
+  root@sonic-s6100-07:~# config vrf add mgmt
+  ```
+
+**config vrf del mgmt**
+
+This command disables the management VRF in the system. This command restarts the "interfaces-config" service which in turn regenerates the /etc/network/interfaces file and restarts the "networking" service. This deletes the interface "mgmt" and deletes the l3mdev CGROUP named "mgmt" and puts back the management interface "eth0" into the default VRF. Note that the VRFName "mgmt" (or "management") is reserved for management VRF. i.e. Data VRFs should not use these reserved VRF names.
+
+- Usage:
+  ```
+  config vrf del mgmt
+  ```
+
+- Example:
+  ```
+  root@sonic-s6100-07:~# config vrf del mgmt
+  ```
+
+**config snmpagentaddress add**
+
+This command adds the SNMP agent IP address on which the SNMP agent is expected to listen. When SNMP agent is expected to work as part of management VRF, users should specify the optional vrf_name parameter as "mgmt". This configuration goes into snmpd.conf that is used by SNMP agent. SNMP service is restarted to make this configuration effective in SNMP agent.
+
+- Usage:
+  ```
+  config snmpagentaddress add [-p <port_num>] [-v <vrf_name>] agentip
+  ```
+
+- Example:
+  ```
+   root@sonic-s6100-07:~#config snmpagentaddress add -v mgmt -p 123 21.22.13.14
+
+   For this example, configuration goes into /etc/snmp/snmpd.conf inside snmp docker as follows. When "-v" parameter is not used, the additional "%" in the following line will not be present.
+
+   agentAddress 21.22.13.14:123%mgmt
+  ```
+
+**config snmpagentaddress del**
+
+This command deletes the SNMP agent IP address on which the SNMP agent is expected to listen. When users had added the agent IP as part of "mgmt" VRF, users should specify the optional vrf_name parameter as "mgmt" while deleting as well. This configuration is removed from snmpd.conf that is used by SNMP agent. SNMP service is restarted to make this configuration effective in SNMP agent.
+
+- Usage:
+  ```
+  config snmpagentaddress del [-p <port_num>] [-v <vrf_name>] agentip
+  ```
+
+- Example:
+  ```
+   root@sonic-s6100-07:~#config snmpagentaddress del -v mgmt -p 123 21.22.13.14
+
+  ```
+
+**config snmptrap modify**
+
+This command modifies the SNMP trap server IP address to which the SNMP agent is expected to send the traps. Users can configure one server IP addrss for each SNMP version to send the traps. When SNMP agent is expected to send traps as part of management VRF, users should specify the optional vrf_name parameter as "mgmt". This configuration goes into snmpd.conf that is used by SNMP agent. SNMP service is restarted to make this configuration effective in SNMP agent.
+
+- Usage:
+  ```
+  config snmptrap modify <snmp_version> [-p <port_num>] [-v <vrf_name>] [-c <community>] trapserverip
+  ```
+
+- Example:
+  ```
+   root@sonic-s6100-07:~#config snmptrap modify 2 -p 456 -v mgmt 21.21.21.21
+
+   For this example, configuration goes into /etc/snmp/snmpd.conf inside snmp docker as follows. When "-v" parameter is not used, the additional "%" in the following line will not be present. In case of SNMPv1, "trapsink" will be updated, in case of v2, "trap2sink" will be updated and in case of v3, "informsink" will be updated.
+
+   trap2sink 31.31.31.31:456%mgmt public
+
+  ```
+
+**config snmptrap del**
+
+This command deletes the SNMP Trap server IP address to which SNMP agent is expected to send TRAPs. When users had added the trap server IP as part of "mgmt" VRF, users should specify the optional vrf_name parameter as "mgmt" while deleting as well. This configuration is removed from snmpd.conf that is used by SNMP agent. SNMP service is restarted to make this configuration effective in SNMP agent.
+
+- Usage:
+  ```
+  config snmptrap del [-p <port_num>] [-v <vrf_name>] [-c <community>] trapserverip
+  ```
+
+- Example:
+  ```
+   root@sonic-s6100-07:~#config snmptrap del -v mgmt -p 123 21.22.13.14
+
+  ```
+
+Go Back To [Beginning of the document](#) or [Beginning of this section](#management-vrf)
 
 
 ## Mirroring
