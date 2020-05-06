@@ -7,7 +7,8 @@ try:
     import os
     import sys
     import syslog
-except ImportError, e:
+    from portconfig import get_port_config_file_name
+except ImportError as e:
     raise ImportError (str(e) + " - required module not found")
 
 #
@@ -108,15 +109,12 @@ class UtilHelper(object):
     # Returns path to port config file
     def get_path_to_port_config_file(self):
         # Get platform and hwsku path
-        (platform_path, hwsku_path) = self.get_path_to_platform_and_hwsku()
+        platform, hwsku = self.get_platform_and_hwsku()
+        
+        port_config_file_path = get_port_config_file_name(hwsku=hwsku, platform=platform)
 
-        # First check for the presence of the new 'port_config.ini' file
-        port_config_file_path = "/".join([hwsku_path, PORT_CONFIG])
-        if not os.path.isfile(port_config_file_path):
-            # port_config.ini doesn't exist. Try loading the legacy 'portmap.ini' file
-            port_config_file_path = "/".join([hwsku_path, PORTMAP])
-            if not os.path.isfile(port_config_file_path):
-                raise IOError("Failed to detect port config file: %s" % (port_config_file_path))
+        if not port_config_file_path:
+            raise IOError("Failed to detect port config file: %s" % (port_config_file_path))
 
         return port_config_file_path
 

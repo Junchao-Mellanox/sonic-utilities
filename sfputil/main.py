@@ -15,6 +15,7 @@ try:
     import types
     import traceback
     from tabulate import tabulate
+    from portconfig import get_port_config_file_name
 except ImportError as e:
     raise ImportError("%s - required module not found" % str(e))
 
@@ -323,18 +324,7 @@ def get_platform_and_hwsku():
 def get_path_to_port_config_file():
     # Get platform and hwsku
     (platform, hwsku) = get_platform_and_hwsku()
-
-    # Load platform module from source
-    platform_path = "/".join([PLATFORM_ROOT_PATH, platform])
-    hwsku_path = "/".join([platform_path, hwsku])
-
-    # First check for the presence of the new 'port_config.ini' file
-    port_config_file_path = "/".join([hwsku_path, "port_config.ini"])
-    if not os.path.isfile(port_config_file_path):
-        # port_config.ini doesn't exist. Try loading the legacy 'portmap.ini' file
-        port_config_file_path = "/".join([hwsku_path, "portmap.ini"])
-
-    return port_config_file_path
+    return get_port_config_file_name(hwsku=hwsku, platform=platform)
 
 
 # Loads platform specific sfputil module from source
