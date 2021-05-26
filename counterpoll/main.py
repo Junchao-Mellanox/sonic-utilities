@@ -90,14 +90,10 @@ def port_buffer_drop():
     """ Port buffer drop  counter commands """
 
 @port_buffer_drop.command()
-@click.argument('poll_interval', type=click.IntRange(30000, 300000))
+@click.argument('poll_interval', type=click.IntRange(1000, 300000))
 def interval(poll_interval):
     """
     Set port_buffer_drop counter query interval
-    This counter group causes high CPU usage when polled,
-    hence the allowed interval is between 30s and 300s.
-    This is a short term solution and
-    should be changed once the performance is enhanced
     """
     configdb = ConfigDBConnector()
     configdb.connect()
@@ -262,7 +258,7 @@ def show():
     if port_info:
         data.append(["PORT_STAT", port_info.get("POLL_INTERVAL", DEFLT_1_SEC), port_info.get("FLEX_COUNTER_STATUS", DISABLE)])
     if port_drop_info:
-        data.append([PORT_BUFFER_DROP, port_drop_info.get("POLL_INTERVAL", DEFLT_60_SEC), port_drop_info.get("FLEX_COUNTER_STATUS", DISABLE)])
+        data.append([PORT_BUFFER_DROP, port_drop_info.get("POLL_INTERVAL", DEFLT_10_SEC), port_drop_info.get("FLEX_COUNTER_STATUS", DISABLE)])
     if rif_info:
         data.append(["RIF_STAT", rif_info.get("POLL_INTERVAL", DEFLT_1_SEC), rif_info.get("FLEX_COUNTER_STATUS", DISABLE)])
     if queue_wm_info:
