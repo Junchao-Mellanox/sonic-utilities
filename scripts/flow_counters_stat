@@ -1,0 +1,210 @@
+#!/usr/bin/env python3
+
+import argparse
+import os
+import _pickle as pickle
+import sys
+
+from natsort import natsorted
+from tabulate import tabulate
+
+# mock the redis for unit test purposes #
+try:
+    if os.environ["UTILITIES_UNIT_TESTING"] == "2":
+        modules_path = os.path.join(os.path.dirname(__file__), "..")
+        tests_path = os.path.join(modules_path, "tests")
+        sys.path.insert(0, modules_path)
+        sys.path.insert(0, tests_path)
+        import mock_tables.dbconnector
+    if os.environ["UTILITIES_UNIT_TESTING_TOPOLOGY"] == "multi_asic":
+        import mock_tables.mock_multi_asic
+        mock_tables.dbconnector.load_namespace_config()
+           
+except KeyError:
+    pass
+
+import utilities_common.multi_asic as multi_asic_util
+from utilities_common.netstat import format_number_with_comma, table_as_json, ns_diff, format_prate
+
+# Flow counter meta data, new type of flow counters can extend this dictinary to reuse existing logic
+flow_counter_meta = {
+    'trap': {
+        'headers': ['Trap Name', 'Packets', 'Bytes', 'PPS'],
+        'name_map': 'COUNTERS_TRAP_NAME_MAP',
+    }
+}
+flow_counters_fields = ['SAI_COUNTER_STAT_PACKETS', 'SAI_COUNTER_STAT_BYTES']
+
+# Only do diff for 'Packets' and 'Bytes'
+diff_column_positions = set([0, 1]) 
+
+FLOW_COUNTER_TABLE_PREFIX = "COUNTERS:"
+RATES_TABLE_PREFIX = 'RATES:'
+PPS_FIELD = 'RX_PPS'
+STATUS_NA = 'N/A'
+
+
+class FlowCounterStats(object):
+    def __init__(self, args):
+        self.db = None
+        self.multi_asic = multi_asic_util.MultiAsic(namespace_option=args.namespace)
+        self.args = args
+        meta_data = flow_counter_meta[args.type]
+        self.name_map = meta_data['name_map']
+        self.headers = meta_data['headers']
+        self.data_file = os.path.join('/tmp/{}-stats-{}'.format(args.type, os.getuid()))
+        if self.args.delete and os.path.exists(self.data_file):
+            os.remove(self.data_file)
+        self.data = {}
+
+    def show(self):
+        """Show flow counter statistic
+        """
+        self._collect()
+        old_data = self._load()
+        self._diff(old_data, self.data)
+        
+        table = []
+        if self.multi_asic.is_multi_asic:
+            # On multi ASIC platform, an extra column "ASIC ID" must be present to avoid duplicate entry name
+            headers = ['ASIC ID'] + self.headers
+            for ns, stats in natsorted(self.data.items()):
+                for name, values in natsorted(stats.items()):
+                    row = [ns, name, format_number_with_comma(values[0]), format_number_with_comma(values[1]), format_prate(values[2])]
+                    table.append(row)
+        else:
+            headers = self.headers
+            for ns, stats in natsorted(self.data.items()):
+                for name, values in natsorted(stats.items()):
+                    row = [name, format_number_with_comma(values[0]), format_number_with_comma(values[1]), format_prate(values[2])]
+                    table.append(row)
+        if self.args.json:
+            print(table_as_json(table, headers))
+        else:
+            print(tabulate(table, headers, tablefmt='simple', stralign='right'))
+
+    def clear(self):
+        """Clear flow counter statistic. This function does not clear data from ASIC. Instead, it saves flow counter statistic to a file. When user
+           issue show command after clear, it does a diff between new data and saved data.  
+        """
+        self._collect()
+        self._save()
+        print('Flow Counters were successfully cleared')
+
+    @multi_asic_util.run_on_multi_asic
+    def _collect(self):
+        """Collect flow counter statistic from DB. This function is called on a multi ASIC context.
+        """
+        self.data.update(self._get_stats_from_db())
+
+    def _get_stats_from_db(self):
+        """Get flow counter statistic from DB.
+
+        Returns:
+            dict: A dictionary. E.g: {<namespace>: {<trap_name>: [<value_in_pkts>, <value_in_bytes>, <rx_pps>]}}
+        """
+        ns = self.multi_asic.current_namespace
+        name_map = self.db.get_all(self.db.COUNTERS_DB, self.name_map)
+        data = {ns: {}}
+        if not name_map:
+            return data
+
+        for name, counter_oid in name_map.items():
+            values = []
+            full_table_id = FLOW_COUNTER_TABLE_PREFIX + counter_oid
+            for field in flow_counters_fields:
+                counter_data =  self.db.get(self.db.COUNTERS_DB, full_table_id, field)
+                values.append(STATUS_NA if counter_data is None else counter_data)
+
+            full_table_id = RATES_TABLE_PREFIX + counter_oid
+            counter_data =  self.db.get(self.db.COUNTERS_DB, full_table_id, PPS_FIELD)
+            values.append(STATUS_NA if counter_data is None else counter_data)
+            values.append(counter_oid)
+            data[ns][name] = values
+        return data
+
+    def _save(self):
+        """Save flow counter statistic to a file
+        """
+        try:
+            if os.path.exists(self.data_file):
+                os.remove(self.data_file)
+
+            with open(self.data_file, 'wb') as f: 
+                pickle.dump(self.data, f)
+        except IOError as e:
+            print('Failed to save statistic - {}'.format(repr(e)))
+
+    def _load(self):
+        """Load flow counter statistic from a file
+
+        Returns:
+            dict: A dictionary. E.g: {<namespace>: {<trap_name>: [<value_in_pkts>, <value_in_bytes>, <rx_pps>]}}
+        """
+        if not os.path.exists(self.data_file):
+            return None
+
+        try:
+            with open(self.data_file, 'rb') as f:
+                data = pickle.load(f)
+        except IOError as e:
+            print('Failed to load statistic - {}'.format(repr(e)))
+            return None
+        
+        return data
+
+    def _diff(self, old_data, new_data):
+        """Do a diff between new data and old data. 
+
+        Args:
+            old_data (dict): E.g: {<namespace>: {<trap_name>: [<value_in_pkts>, <value_in_bytes>, <rx_pps>]}}
+            new_data (dict): E.g: {<namespace>: {<trap_name>: [<value_in_pkts>, <value_in_bytes>, <rx_pps>]}}
+        """
+        if not old_data:
+            return
+
+        for ns, stats in new_data.items():
+            if ns not in old_data:
+                continue
+            old_stats = old_data[ns]
+            for name, values in stats.items():
+                if name not in old_stats:
+                    continue
+
+                old_values = old_stats[name]
+                if values[-1] != old_values[-1]:
+                    # Counter OID not equal means the trap was removed and added again. Removing a trap would cause
+                    # the stats value restart from 0. To avoid get minus value here, it should not do diff in case
+                    # counter OID is changed.
+                    continue
+
+                for i in diff_column_positions:
+                    values[i] = ns_diff(values[i], old_values[i])
+
+
+def main():
+    parser  = argparse.ArgumentParser(description='Display the flow counters',
+                                    formatter_class=argparse.RawTextHelpFormatter,
+                                    epilog="""
+Examples:
+  flow_counters_stat -c -t trap
+  flow_counters_stat -t trap
+  flow_counters_stat -d -t trap
+""")
+    parser.add_argument('-c', '--clear', action='store_true', help='Copy & clear stats')
+    parser.add_argument('-d', '--delete', action='store_true', help='Delete saved stats')
+    parser.add_argument('-j', '--json', action='store_true', help='Display in JSON format')
+    parser.add_argument('-n','--namespace', default=None, help='Display flow counters for specific namespace')
+    parser.add_argument('-t', '--type', required=True, choices=['trap'],help='Flow counters type')
+
+    args = parser.parse_args()
+
+    stats = FlowCounterStats(args)
+    if args.clear:
+        stats.clear()
+    else:
+        stats.show()
+
+
+if __name__ == '__main__':
+    main()
