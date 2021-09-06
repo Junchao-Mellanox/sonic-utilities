@@ -449,6 +449,13 @@ def translations():
     cmd = "natclear -t"
     run_command(cmd)
 
+# ("sonic-clear flowcnt-trap")
+@cli.command()
+def flowcnt_trap():
+    """ Clear trap flow counters """
+    command = "flow_counters_stat -c -t trap"
+    run_command(command)
+
 
 # Load plugins and register them
 helper = util_base.UtilHelper()

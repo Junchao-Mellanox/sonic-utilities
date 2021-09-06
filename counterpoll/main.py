@@ -53,12 +53,12 @@ def disable():
 # Port counter commands
 @cli.group()
 def port():
-    """ Queue counter commands """
+    """ Port counter commands """
 
 @port.command()
 @click.argument('poll_interval', type=click.IntRange(100, 30000))
 def interval(poll_interval):
-    """ Set queue counter query interval """
+    """ Set port counter query interval """
     configdb = ConfigDBConnector()
     configdb.connect()
     port_info = {}
@@ -241,6 +241,39 @@ def disable():
     configdb.mod_entry("FLEX_COUNTER_TABLE", "PG_WATERMARK", fc_info)
     configdb.mod_entry("FLEX_COUNTER_TABLE", BUFFER_POOL_WATERMARK, fc_info)
 
+# Trap flow counter commands
+@cli.group()
+@click.pass_context
+def flowcnt_trap(ctx):
+    """ Trap flow counter commands """
+    ctx.obj = ConfigDBConnector()
+    ctx.obj.connect()
+
+@flowcnt_trap.command()
+@click.argument('poll_interval', type=click.IntRange(1000, 30000))
+@click.pass_context
+def interval(ctx, poll_interval):
+    """ Set trap flow counter query interval """
+    fc_info = {}
+    fc_info['POLL_INTERVAL'] = poll_interval
+    ctx.obj.mod_entry("FLEX_COUNTER_TABLE", "FLOW_CNT_TRAP", fc_info)
+
+@flowcnt_trap.command()
+@click.pass_context
+def enable(ctx):
+    """ Enable trap flow counter query """
+    fc_info = {}
+    fc_info['FLEX_COUNTER_STATUS'] = 'enable'
+    ctx.obj.mod_entry("FLEX_COUNTER_TABLE", "FLOW_CNT_TRAP", fc_info)
+
+@flowcnt_trap.command()
+@click.pass_context
+def disable(ctx):
+    """ Disable trap flow counter query """
+    fc_info = {}
+    fc_info['FLEX_COUNTER_STATUS'] = 'disable'
+    ctx.obj.mod_entry("FLEX_COUNTER_TABLE", "FLOW_CNT_TRAP", fc_info)
+
 @cli.command()
 def show():
     """ Show the counter configuration """
@@ -254,6 +287,7 @@ def show():
     pg_wm_info = configdb.get_entry('FLEX_COUNTER_TABLE', 'PG_WATERMARK')
     pg_drop_info = configdb.get_entry('FLEX_COUNTER_TABLE', PG_DROP)
     buffer_pool_wm_info = configdb.get_entry('FLEX_COUNTER_TABLE', BUFFER_POOL_WATERMARK)
+    trap_info = configdb.get_entry('FLEX_COUNTER_TABLE', 'FLOW_CNT_TRAP')
     
     header = ("Type", "Interval (in ms)", "Status")
     data = []
@@ -273,6 +307,8 @@ def show():
         data.append(['PG_DROP_STAT', pg_drop_info.get("POLL_INTERVAL", DEFLT_10_SEC), pg_drop_info.get("FLEX_COUNTER_STATUS", DISABLE)])
     if buffer_pool_wm_info:
         data.append(["BUFFER_POOL_WATERMARK_STAT", buffer_pool_wm_info.get("POLL_INTERVAL", DEFLT_10_SEC), buffer_pool_wm_info.get("FLEX_COUNTER_STATUS", DISABLE)])
+    if trap_info:
+        data.append(["FLOW_CNT_TRAP_STAT", trap_info.get("POLL_INTERVAL", DEFLT_1_SEC), trap_info.get("FLEX_COUNTER_STATUS", DISABLE)])
 
     click.echo(tabulate(data, headers=header, tablefmt="simple", missingval=""))
 
