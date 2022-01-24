@@ -6,7 +6,6 @@ from tabulate import tabulate
 
 from flow_counter_util.route import FLOW_COUNTER_ROUTE_PATTERN_TABLE, FLOW_COUNTER_ROUTE_MAX_MATCH_FIELD, FLOW_COUNTER_ROUTE_CONFIG_HEADER, DEFAULT_MAX_MATCH
 from flow_counter_util.route import extract_route_pattern, check_route_flow_counter_support
-from utilities_common.cli import pass_db
 
 #
 # 'flowcnt-trap' group ###
@@ -38,7 +37,7 @@ def flowcnt_route():
 
 
 @flowcnt_route.command()
-@pass_db
+@clicommon.pass_db
 def config(db):
     """Show route flow counter configuration"""
     route_pattern_table = db.cfgdb.get_table(FLOW_COUNTER_ROUTE_PATTERN_TABLE)

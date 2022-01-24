@@ -1,6 +1,5 @@
 import click
 import ipaddress
-import sys
 
 from flow_counter_util.route import FLOW_COUNTER_ROUTE_PATTERN_TABLE, FLOW_COUNTER_ROUTE_MAX_MATCH_FIELD, DEFAULT_VRF, PATTERN_SEPARATOR
 from flow_counter_util.route import build_route_pattern, extract_route_pattern, check_route_flow_counter_support

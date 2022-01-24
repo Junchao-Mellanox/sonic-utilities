@@ -1,5 +1,4 @@
 import os
-import ipaddress
 import sys
 from swsscommon.swsscommon import SonicV2Connector
 
@@ -9,7 +8,7 @@ try:
         test_path = os.path.join(modules_path, "tests")
         sys.path.insert(0, modules_path)
         sys.path.insert(0, test_path)
-        import mock_tables.dbconnector
+        import mock_tables.dbconnector  # lgtm[py/unused-import]
 except KeyError:
     pass
 
