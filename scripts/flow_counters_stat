@@ -47,7 +47,6 @@ diff_column_positions = set([0, 1])
 FLOW_COUNTER_TABLE_PREFIX = "COUNTERS:"
 RATES_TABLE_PREFIX = 'RATES:'
 PPS_FIELD = 'RX_PPS'
-STATUS_NA = 'N/A'
 
 
 class FlowCounterStats(object):
@@ -156,7 +155,7 @@ class FlowCounterStats(object):
 
             full_table_id = RATES_TABLE_PREFIX + counter_oid
             counter_data =  self.db.get(self.db.COUNTERS_DB, full_table_id, PPS_FIELD)
-            values.append(STATUS_NA if counter_data is None else counter_data)
+            values.append('0' if counter_data is None else counter_data)
             values.append(counter_oid)
             data[ns][name] = values
         return data
@@ -174,7 +173,7 @@ class FlowCounterStats(object):
         full_table_id = FLOW_COUNTER_TABLE_PREFIX + counter_oid
         for field in flow_counters_fields:
             counter_data =  self.db.get(self.db.COUNTERS_DB, full_table_id, field)
-            values.append(STATUS_NA if counter_data is None else counter_data)
+            values.append('0' if counter_data is None else counter_data)
         return values
 
     def _save(self, data):
