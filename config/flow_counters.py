@@ -2,7 +2,7 @@ import click
 import ipaddress
 
 from flow_counter_util.route import FLOW_COUNTER_ROUTE_PATTERN_TABLE, FLOW_COUNTER_ROUTE_MAX_MATCH_FIELD, DEFAULT_VRF, PATTERN_SEPARATOR
-from flow_counter_util.route import build_route_pattern, extract_route_pattern, check_route_flow_counter_support
+from flow_counter_util.route import build_route_pattern, extract_route_pattern, exit_if_route_flow_counter_not_support
 from utilities_common.cli import AbbreviationGroup, pass_db
 from utilities_common import cli # To make mock work in unit test
 
@@ -54,7 +54,7 @@ def _update_route_flow_counter_config(db, vrf, max_allowed_match, prefix_pattern
     :param yes: Don't ask question if True
     :return:
     """
-    check_route_flow_counter_support()
+    exit_if_route_flow_counter_not_support()
 
     if add:
         try:
@@ -68,7 +68,7 @@ def _update_route_flow_counter_config(db, vrf, max_allowed_match, prefix_pattern
 
         key = build_route_pattern(vrf, prefix_pattern)
         for _, cfgdb in db.cfgdb_clients.items():
-            if _try_find_existing_pattern(cfgdb, net, key, yes):
+            if _try_find_existing_pattern_by_ip_type(cfgdb, net, key, yes):
                 entry_data = cfgdb.get_entry(FLOW_COUNTER_ROUTE_PATTERN_TABLE, key)
                 old_max_allowed_match = entry_data.get(FLOW_COUNTER_ROUTE_MAX_MATCH_FIELD)
                 if old_max_allowed_match is not None and int(old_max_allowed_match) == max_allowed_match:
@@ -93,8 +93,13 @@ def _update_route_flow_counter_config(db, vrf, max_allowed_match, prefix_pattern
             exit(1)
 
 
-def _try_find_existing_pattern(cfgdb, input_net, input_key, yes):
-    """Try to find the same pattern from CONFIG DB
+def _try_find_existing_pattern_by_ip_type(cfgdb, input_net, input_key, yes):
+    """Try to find the same IP type pattern from CONFIG DB. 
+        1. If found a pattern with the same IP type, but the patter does not equal, ask user if need to replace the old with new one
+            a. If user types "yes", remove the old one, return False
+            b. If user types "no", exit
+        2. If found a pattern with the same IP type and the pattern equal, return True
+        3. If not found a pattern with the same IP type, return False
 
     Args:
         cfgdb (object): CONFIG DB object
@@ -103,7 +108,7 @@ def _try_find_existing_pattern(cfgdb, input_net, input_key, yes):
         yes (bool): Whether ask user question
 
     Returns:
-        bool: True if found an existing one
+        bool: True if found the same pattern in CONFIG DB
     """
     input_type = type(input_net) # IPv4 or IPv6
     found_invalid = []

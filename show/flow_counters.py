@@ -5,7 +5,7 @@ import utilities_common.multi_asic as multi_asic_util
 from tabulate import tabulate
 
 from flow_counter_util.route import FLOW_COUNTER_ROUTE_PATTERN_TABLE, FLOW_COUNTER_ROUTE_MAX_MATCH_FIELD, FLOW_COUNTER_ROUTE_CONFIG_HEADER, DEFAULT_MAX_MATCH
-from flow_counter_util.route import extract_route_pattern, check_route_flow_counter_support
+from flow_counter_util.route import extract_route_pattern, exit_if_route_flow_counter_not_support
 
 #
 # 'flowcnt-trap' group ###
@@ -33,7 +33,7 @@ def stats(verbose, namespace):
 @click.group(cls=clicommon.AliasedGroup)
 def flowcnt_route():
     """Show route flow counter related information"""
-    check_route_flow_counter_support()
+    exit_if_route_flow_counter_not_support()
 
 
 @flowcnt_route.command()

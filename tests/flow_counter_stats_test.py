@@ -86,8 +86,8 @@ Route pattern    VRF        Max
 expect_show_all_route_stats = """\
   Route pattern      VRF    Matched routes    Packets    Bytes
 ---------------  -------  ----------------  ---------  -------
-     1.1.1.0/24  default        1.1.1.1/24        100    2,000
-                                1.1.1.2/24      1,000    2,000
+     1.1.1.0/24  default        1.1.1.1/31        100    2,000
+                                1.1.1.2/31      1,000    2,000
       2001::/64  default        2001::1/64         50    1,000
       2001::/64    Vrf_1        2001::1/64      1,000   25,000
 """
@@ -95,8 +95,8 @@ expect_show_all_route_stats = """\
 expect_show_route_stats_by_pattern_v4 = """\
   Route pattern      VRF    Matched routes    Packets    Bytes
 ---------------  -------  ----------------  ---------  -------
-     1.1.1.0/24  default        1.1.1.1/24        100    2,000
-                                1.1.1.2/24      1,000    2,000
+     1.1.1.0/24  default        1.1.1.1/31        100    2,000
+                                1.1.1.2/31      1,000    2,000
 """
 
 expect_show_route_stats_by_pattern_v6 = """\
@@ -119,7 +119,7 @@ expect_show_route_stats_by_pattern_empty = """\
 expect_show_route_stats_by_route_v4 = """\
      Route      VRF    Route pattern    Packets    Bytes
 ----------  -------  ---------------  ---------  -------
-1.1.1.1/24  default       1.1.1.0/24        100    2,000
+1.1.1.1/31  default       1.1.1.0/24        100    2,000
 """
 
 expect_show_route_stats_by_route_v6 = """\
@@ -137,8 +137,8 @@ expect_show_route_stats_by_route_and_vrf_v6 = """\
 expect_after_clear_route_stats_all = """\
   Route pattern      VRF    Matched routes    Packets    Bytes
 ---------------  -------  ----------------  ---------  -------
-     1.1.1.0/24  default        1.1.1.1/24          0        0
-                                1.1.1.2/24          0        0
+     1.1.1.0/24  default        1.1.1.1/31          0        0
+                                1.1.1.2/31          0        0
       2001::/64  default        2001::1/64          0        0
       2001::/64    Vrf_1        2001::1/64          0        0
 """
@@ -146,8 +146,8 @@ expect_after_clear_route_stats_all = """\
 expect_after_clear_route_stats_by_pattern_v4 = """\
   Route pattern      VRF    Matched routes    Packets    Bytes
 ---------------  -------  ----------------  ---------  -------
-     1.1.1.0/24  default        1.1.1.1/24          0        0
-                                1.1.1.2/24          0        0
+     1.1.1.0/24  default        1.1.1.1/31          0        0
+                                1.1.1.2/31          0        0
       2001::/64  default        2001::1/64         50    1,000
       2001::/64    Vrf_1        2001::1/64      1,000   25,000
 """
@@ -155,8 +155,8 @@ expect_after_clear_route_stats_by_pattern_v4 = """\
 expect_after_clear_route_stats_by_pattern_v6 = """\
   Route pattern      VRF    Matched routes    Packets    Bytes
 ---------------  -------  ----------------  ---------  -------
-     1.1.1.0/24  default        1.1.1.1/24          0        0
-                                1.1.1.2/24          0        0
+     1.1.1.0/24  default        1.1.1.1/31          0        0
+                                1.1.1.2/31          0        0
       2001::/64  default        2001::1/64          0        0
       2001::/64    Vrf_1        2001::1/64      1,000   25,000
 """
@@ -165,14 +165,14 @@ expect_show_route_stats_all_json = """\
 {
     "0": {
         "Bytes": "2,000",
-        "Matched routes": "1.1.1.1/24",
+        "Matched routes": "1.1.1.1/31",
         "Packets": "100",
         "Route pattern": "1.1.1.0/24",
         "VRF": "default"
     },
     "1": {
         "Bytes": "2,000",
-        "Matched routes": "1.1.1.2/24",
+        "Matched routes": "1.1.1.2/31",
         "Packets": "1,000",
         "Route pattern": "1.1.1.0/24",
         "VRF": "default"
@@ -198,14 +198,14 @@ expect_show_route_stats_by_pattern_v4_json = """\
 {
     "0": {
         "Bytes": "2,000",
-        "Matched routes": "1.1.1.1/24",
+        "Matched routes": "1.1.1.1/31",
         "Packets": "100",
         "Route pattern": "1.1.1.0/24",
         "VRF": "default"
     },
     "1": {
         "Bytes": "2,000",
-        "Matched routes": "1.1.1.2/24",
+        "Matched routes": "1.1.1.2/31",
         "Packets": "1,000",
         "Route pattern": "1.1.1.0/24",
         "VRF": "default"
@@ -228,9 +228,9 @@ expect_show_route_stats_by_pattern_and_vrf_v6_json = """\
 expect_show_route_stats_all_multi_asic = """\
   ASIC ID    Route pattern      VRF    Matched routes    Packets    Bytes
 ---------  ---------------  -------  ----------------  ---------  -------
-    asic0       1.1.1.0/24  default        1.1.1.1/24        100    2,000
-                                           1.1.1.3/24        200    4,000
-    asic1       1.1.1.0/24  default        1.1.1.2/24      1,000    2,000
+    asic0       1.1.1.0/24  default        1.1.1.1/31        100    2,000
+                                           1.1.1.3/31        200    4,000
+    asic1       1.1.1.0/24  default        1.1.1.2/31      1,000    2,000
 """
 
 expect_show_route_stats_all_json_multi_asic = """\
@@ -238,7 +238,7 @@ expect_show_route_stats_all_json_multi_asic = """\
     "0": {
         "ASIC ID": "asic0",
         "Bytes": "2,000",
-        "Matched routes": "1.1.1.1/24",
+        "Matched routes": "1.1.1.1/31",
         "Packets": "100",
         "Route pattern": "1.1.1.0/24",
         "VRF": "default"
@@ -246,7 +246,7 @@ expect_show_route_stats_all_json_multi_asic = """\
     "1": {
         "ASIC ID": "asic0",
         "Bytes": "4,000",
-        "Matched routes": "1.1.1.3/24",
+        "Matched routes": "1.1.1.3/31",
         "Packets": "200",
         "Route pattern": "1.1.1.0/24",
         "VRF": "default"
@@ -254,7 +254,7 @@ expect_show_route_stats_all_json_multi_asic = """\
     "2": {
         "ASIC ID": "asic1",
         "Bytes": "2,000",
-        "Matched routes": "1.1.1.2/24",
+        "Matched routes": "1.1.1.2/31",
         "Packets": "1,000",
         "Route pattern": "1.1.1.0/24",
         "VRF": "default"
@@ -265,9 +265,9 @@ expect_show_route_stats_all_json_multi_asic = """\
 expect_after_clear_route_stats_all_multi_asic = """\
   ASIC ID    Route pattern      VRF    Matched routes    Packets    Bytes
 ---------  ---------------  -------  ----------------  ---------  -------
-    asic0       1.1.1.0/24  default        1.1.1.1/24          0        0
-                                           1.1.1.3/24          0        0
-    asic1       1.1.1.0/24  default        1.1.1.2/24          0        0
+    asic0       1.1.1.0/24  default        1.1.1.1/31          0        0
+                                           1.1.1.3/31          0        0
+    asic1       1.1.1.0/24  default        1.1.1.2/31          0        0
 """
 
 def delete_cache(stat_type='trap'):
@@ -454,6 +454,7 @@ class TestConfigRoutePattern:
         )
 
         assert result.exit_code == 0
+        table = db.cfgdb.get_table(FLOW_COUNTER_ROUTE_PATTERN_TABLE)
         assert prefix in table
 
         prefix_v6 = '2000::/64'
@@ -545,14 +546,14 @@ class TestConfigRoutePattern:
         )
 
         assert result.exit_code == 1
-        assert 'does not exist' in result.output
+        assert 'Failed to remove route pattern: {} does not exist'.format(prefix) in result.output
 
         result = runner.invoke(
             config.config.commands["flowcnt-route"].commands["pattern"].commands["remove"],
             ['invalid']
         )
         assert result.exit_code == 1
-        assert 'does not exist' in result.output
+        assert 'Failed to remove route pattern: {} does not exist'.format('invalid') in result.output
 
     def test_add_pattern_repeatly(self):
         runner = CliRunner()
@@ -738,7 +739,7 @@ class TestRouteStats:
         runner = CliRunner()
         result = runner.invoke(
             show.cli.commands["flowcnt-route"].commands["stats"].commands["route"],
-            ['1.1.1.1/24']
+            ['1.1.1.1/31']
         )
 
         assert result.exit_code == 0

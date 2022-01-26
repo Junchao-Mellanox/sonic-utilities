@@ -7,7 +7,7 @@ import utilities_common.cli as clicommon
 import utilities_common.multi_asic as multi_asic_util
 import json
 
-from flow_counter_util.route import check_route_flow_counter_support
+from flow_counter_util.route import exit_if_route_flow_counter_not_support
 from utilities_common import util_base
 from show.plugins.pbh import read_pbh_counters
 from . import plugins
@@ -498,7 +498,7 @@ def flowcnt_trap():
 @click.pass_context
 def flowcnt_route(ctx, namespace):
     """Clear all route flow counters"""
-    check_route_flow_counter_support()
+    exit_if_route_flow_counter_not_support()
     if ctx.invoked_subcommand is None:
         command = "flow_counters_stat -c -t route"
         # None namespace means default namespace

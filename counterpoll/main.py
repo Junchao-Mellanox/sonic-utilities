@@ -1,6 +1,6 @@
 import click
 import json
-from flow_counter_util.route import check_route_flow_counter_support
+from flow_counter_util.route import exit_if_route_flow_counter_not_support
 from swsscommon.swsscommon import ConfigDBConnector
 from tabulate import tabulate
 
@@ -353,7 +353,7 @@ def disable(ctx):
 @click.pass_context
 def flowcnt_route(ctx):
     """ Route flow counter commands """
-    check_route_flow_counter_support()
+    exit_if_route_flow_counter_not_support()
     ctx.obj = ConfigDBConnector()
     ctx.obj.connect()
 

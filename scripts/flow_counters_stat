@@ -24,7 +24,7 @@ except KeyError:
     pass
 
 import utilities_common.multi_asic as multi_asic_util
-from flow_counter_util.route import build_route_pattern, extract_route_pattern, check_route_flow_counter_support, DEFAULT_VRF, COUNTERS_ROUTE_TO_PATTERN_MAP
+from flow_counter_util.route import build_route_pattern, extract_route_pattern, exit_if_route_flow_counter_not_support, DEFAULT_VRF, COUNTERS_ROUTE_TO_PATTERN_MAP
 from utilities_common import constants
 from utilities_common.netstat import format_number_with_comma, table_as_json, ns_diff, format_prate
 
@@ -573,7 +573,7 @@ Examples:
     if args.type == 'trap':
         stats = FlowCounterStats(args)
     elif args.type == 'route':
-        check_route_flow_counter_support()
+        exit_if_route_flow_counter_not_support()
         stats = RouteFlowCounterStats(args)
     else:
         print('Invalid flow counter type: {}'.format(args.type))

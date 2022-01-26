@@ -61,7 +61,7 @@ def get_route_flow_counter_capability():
     return state_db.get_all(state_db.STATE_DB, '{}|{}'.format(FLOW_COUNTER_CAPABILITY_TABLE, FLOW_COUNTER_CAPABILITY_KEY))
 
 
-def check_route_flow_counter_support():
+def exit_if_route_flow_counter_not_support():
     capabilities = get_route_flow_counter_capability()
     if not capabilities:
         print('Waiting for swss to initialize route flow counter capability, please try again later')
