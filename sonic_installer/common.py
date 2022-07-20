@@ -31,6 +31,8 @@ def run_command(command):
     if proc.returncode != 0:
         sys.exit(proc.returncode)
 
+    return out.rstrip("\n")
+
 # Run bash command and return output, raise if it fails
 def run_command_or_raise(argv, raise_exception=True):
     click.echo(click.style("Command: ", fg='cyan') + click.style(' '.join(argv), fg='green'))

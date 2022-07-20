@@ -134,7 +134,7 @@ def get_docker_tag_name(image):
 
 
 def echo_and_log(msg, priority=LOG_NOTICE, fg=None):
-    if priority >= LOG_ERR:
+    if priority == LOG_ERR:
         # Print to stderr if priority is error
         click.secho(msg, fg=fg, err=True)
     else:
@@ -819,17 +819,17 @@ def upgrade_docker(container_name, url, cleanup_image, skip_check, tag, warm):
     # this is image_id for image with "latest" tag
     image_id_latest = get_container_image_id(image_latest)
 
-    for id in image_id_all:
-        if id != image_id_latest:
-            # Unless requested, the previoud docker image will be preserved
-            if not cleanup_image and id == image_id_previous:
-                continue
-            run_command("docker rmi -f %s" % id)
+    if cleanup_image:
+        # Unless requested, the previoud docker image will be preserved
+        for id in image_id_all:
+            if id != image_id_latest and id == image_id_previous:
+                run_command("docker rmi -f %s" % id)
+                break
 
     exp_state = "reconciled"
     state = ""
     # post warm restart specific procssing for swss, bgp and teamd dockers, wait for reconciliation state.
-    if warm_configured is True or warm:
+    if warm_app_names and (warm_configured is True or warm):
         count = 0
         for warm_app_name in warm_app_names:
             state = ""
@@ -885,7 +885,8 @@ def rollback_docker(container_name):
     version_tag = ""
     for id in image_id_all:
         if id != image_id_previous:
-            version_tag = get_docker_tag_name(id)
+            version_tag = run_command("docker images --format '{{{{.ID}}}} {{{{.Tag}}}}' | grep {} | awk '{{print $2}}'".format(id))
+            break
 
     # make previous image as latest
     run_command("docker tag %s:%s %s:latest" % (image_name, version_tag, image_name))
