@@ -185,6 +185,9 @@ class ManifestSchema:
                 ManifestArray('after', DefaultMarshaller(str)),
                 ManifestArray('before', DefaultMarshaller(str)),
             ]),
+            ManifestRoot('syslog', [
+                ManifestField('support-rate-limit', DefaultMarshaller(bool), False),
+            ]),
         ]),
         ManifestRoot('container', [
             ManifestField('privileged', DefaultMarshaller(bool), False),
