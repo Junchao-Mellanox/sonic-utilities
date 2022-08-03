@@ -2,17 +2,27 @@ import click
 
 import json
 import ipaddress
+import os
 import subprocess
 
 import utilities_common.cli as clicommon
 from sonic_py_common import logger
+from sonic_py_common import multi_asic
+from sonic_package_manager.manager import PackageManager
 
 
+FEATURE_TABLE = "FEATURE"
+SYSLOG_CONFIG_TABLE = 'SYSLOG_CONFIG'
+SYSLOG_CONFIG_GLOBAL_KEY = 'GLOBAL'
+SYSLOG_CONFIG_FEATURE_TABLE = 'SYSLOG_CONFIG_FEATURE'
 SYSLOG_TABLE_CDB = "SYSLOG_SERVER"
 
 SYSLOG_SOURCE = "source"
 SYSLOG_PORT = "port"
 SYSLOG_VRF = "vrf"
+
+SYSLOG_RATE_LIMIT_INTERVAL = 'rate_limit_interval'
+SYSLOG_RATE_LIMIT_BURST = 'rate_limit_burst'
 
 VRF_TABLE_CDB = "VRF"
 MGMT_VRF_TABLE_CDB = "MGMT_VRF_CONFIG"
@@ -447,3 +457,99 @@ def delete(db, server_ip_address):
     except Exception as e:
         log.log_error("Failed to remove remote syslog logging: {}".format(str(e)))
         ctx.fail(str(e))
+
+
+@syslog.command("rate-limit-host")
+@click.option("-i", "--interval", help="Configures syslog rate limit interval in seconds for host", type=click.IntRange(0, 2147483647))
+@click.option("-b", "--burst", help="Configures syslog rate limit burst in number of messages for host", type=click.IntRange(0, 2147483647))
+@clicommon.pass_db
+def rate_limit_host(db, interval, burst):
+    """ Configure syslog rate limit for host """
+
+    if interval is None and burst is None:
+        raise click.UsageError('Either interval or burst must be configured')
+
+    if interval == 0 or burst == 0:
+        click.echo(f'Disable syslog rate limit for host')
+        interval = 0
+        burst = 0
+
+    data = {}
+    if interval is not None:
+        data[SYSLOG_RATE_LIMIT_INTERVAL] = interval
+    if burst is not None:
+        data[SYSLOG_RATE_LIMIT_BURST] = burst
+    db.cfgdb.mod_entry(SYSLOG_CONFIG_TABLE, SYSLOG_CONFIG_GLOBAL_KEY, data)
+
+    try:
+        clicommon.run_command("systemctl reset-failed rsyslog-config rsyslog", display_cmd=True)
+        clicommon.run_command("systemctl restart rsyslog-config", display_cmd=True)
+    except Exception as e:
+        log.log_error("Failed to configure syslog rate limit for host: {}".format(str(e)))
+        raise click.ClickException(str(e))
+
+
+@syslog.command("rate-limit-container")
+@click.argument("service_name", required=True)
+@click.option("-i", "--interval", help="Configures syslog rate limit interval in seconds for containers", type=click.IntRange(0, 2147483647))
+@click.option("-b", "--burst", help="Configures syslog rate limit burst in number of messages for containers", type=click.IntRange(0, 2147483647))
+@clicommon.pass_db
+def rate_limit_container(db, service_name, interval, burst):
+    """ Configure syslog rate limit for containers """
+
+    if interval is None and burst is None:
+        raise click.UsageError('Either interval or burst must be configured')
+
+    features = db.cfgdb.get_table(FEATURE_TABLE)
+    if service_name not in features:
+        raise click.ClickException('Invalid service name {}, please choose from: {}'.format(service_name, ','.join(features.keys())))
+
+    service_data = features[service_name]
+    state = service_data.get('state')
+    if state in ['disabled', 'always_disabled']:
+        raise click.ClickException('Service {} is disabled, please enable it first'.format(service_name, ))
+
+    support_rate_limit = service_data.get('support_syslog_rate_limit', '').lower() == 'true'
+    if not support_rate_limit:
+        raise click.ClickException('Service {} does not support syslog rate limit'.format(service_name))
+
+    if interval == 0 or burst == 0:
+        click.echo(f'Disable syslog rate limit for service {service_name}')
+        interval = 0
+        burst = 0
+
+    data = {}
+    if interval is not None:
+        data[SYSLOG_RATE_LIMIT_INTERVAL] = interval
+    if burst is not None:
+        data[SYSLOG_RATE_LIMIT_BURST] = burst
+    db.cfgdb.mod_entry(SYSLOG_CONFIG_FEATURE_TABLE, service_name, data)
+
+    customized_rate_limit = service_data.get('has_customized_syslog_rate_limit', '').lower() == 'true'
+    if customized_rate_limit:
+        return
+
+    try:
+        if multi_asic.is_multi_asic():
+            target_ip = clicommon.run_command('docker network inspect bridge --format "{{(index .IPAM.Config 0).Gateway}}"', return_cmd=True, display_cmd=True)
+        else:
+            target_ip = '127.0.0.1'
+
+        for ns, _ in db.cfgdb_clients.items():
+            if multi_asic.is_multi_asic():
+                asic_id = multi_asic.get_asic_id_from_name(ns)
+            else:
+                asic_id = ''
+            container_name = service_name + asic_id
+            tmp_file = f"/tmp/rsyslog.{container_name}.conf"
+            if os.path.exists(tmp_file):
+                os.remove(tmp_file)
+            clicommon.run_command('sonic-cfggen -d -t /usr/share/sonic/templates/rsyslog-container.conf.j2 -a "{{\\"target_ip\\": \\"{}\\", \\"container_name\\": \\"{}\\" }}"  > {}'.format(target_ip, container_name, tmp_file), display_cmd=True)
+            clicommon.run_command('docker cp {} {}:/etc/rsyslog.conf'.format(tmp_file, container_name))
+            clicommon.run_command("docker exec -i {} bash -c 'supervisorctl restart {}'".format(container_name, 'rsyslogd'))
+    except Exception as e:
+        log.log_error("Failed to configure syslog rate limit for container {}: {}".format(service_name, str(e)))
+        raise click.ClickException(str(e))
+    finally:
+        if os.path.exists(tmp_file):
+            os.remove(tmp_file)

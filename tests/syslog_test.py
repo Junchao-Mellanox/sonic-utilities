@@ -30,6 +30,12 @@ ERROR_PATTERN_NONEXISTENT_VRF = "VRF doesn't exist in Linux"
 SUCCESS = 0
 ERROR2 = 2
 
+FEATURE_TABLE = 'FEATURE'
+SYSLOG_CONFIG_TABLE = 'SYSLOG_CONFIG'
+SYSLOG_CONFIG_GLOBAL_KEY = 'GLOBAL'
+SYSLOG_CONFIG_FEATURE_TABLE = 'SYSLOG_CONFIG_FEATURE'
+SYSLOG_RATE_LIMIT_INTERVAL = 'rate_limit_interval'
+SYSLOG_RATE_LIMIT_BURST = 'rate_limit_burst'
 
 test_path = os.path.dirname(os.path.abspath(__file__))
 mock_db_path = os.path.join(test_path, "syslog_input")
@@ -213,6 +219,117 @@ class TestSyslog:
         assert ERROR_PATTERN_NONEXISTENT_VRF in result.output
         assert result.exit_code == ERROR2
 
+    @pytest.mark.parametrize("test_data", [{'interval':1, 'burst':100, 'expected_interval': '1', 'expected_burst': '100'},
+                                           {'interval':0, 'burst':100, 'expected_interval': '0', 'expected_burst': '0'},
+                                           {'interval':1, 'burst':0, 'expected_interval': '0', 'expected_burst': '0'}])
+    @mock.patch("utilities_common.cli.run_command", mock.MagicMock(return_value=None))
+    def test_config_syslog_rate_limit_host(self, test_data):
+        db = Db()
+        runner = CliRunner()
+
+        result = runner.invoke(
+            config.config.commands["syslog"].commands["rate-limit-host"],
+            ["--interval", test_data['interval'], "--burst", test_data['burst']], obj=db
+        )
+
+        assert result.exit_code == SUCCESS
+
+        table = db.cfgdb.get_table(SYSLOG_CONFIG_TABLE)
+        assert SYSLOG_CONFIG_GLOBAL_KEY in table
+        entry = table[SYSLOG_CONFIG_GLOBAL_KEY]
+        assert SYSLOG_RATE_LIMIT_INTERVAL in entry
+        assert SYSLOG_RATE_LIMIT_BURST in entry
+        assert entry[SYSLOG_RATE_LIMIT_INTERVAL] == test_data['expected_interval']
+        assert entry[SYSLOG_RATE_LIMIT_BURST] == test_data['expected_burst']
+
+    @pytest.mark.parametrize("test_data", [{'subcommand': 'rate-limit-host', 'arguments': []},
+                                           {'subcommand': 'rate-limit-container', 'arguments': ['bgp']}])
+    def test_config_syslog_rate_limit_no_option(self, test_data):
+        db = Db()
+        runner = CliRunner()
+
+        result = runner.invoke(
+            config.config.commands["syslog"].commands[test_data['subcommand']], test_data['arguments'], obj=db
+        )
+        assert result.exit_code == ERROR2
+
+    @pytest.mark.parametrize("test_data", [{'interval':1, 'burst':100, 'expected_interval': '1', 'expected_burst': '100'},
+                                           {'interval':0, 'burst':100, 'expected_interval': '0', 'expected_burst': '0'},
+                                           {'interval':1, 'burst':0, 'expected_interval': '0', 'expected_burst': '0'}])
+    @mock.patch("utilities_common.cli.run_command")
+    @mock.patch("sonic_package_manager.manager.PackageManager.get_manager")
+    @mock.patch("sonic_py_common.multi_asic.is_multi_asic", mock.MagicMock(return_value=False))
+    def test_config_syslog_rate_limit_container_basic(self, mock_pkg_mgr, mock_run_cmd, test_data):
+        db = Db()
+        db.cfgdb.set_entry(FEATURE_TABLE, 'bgp', {'support_syslog_rate_limit': 'true',
+                                                  'has_customized_syslog_rate_limit': 'false',
+                                                  'state': 'enabled'})
+
+        runner = CliRunner()
+
+        result = runner.invoke(
+            config.config.commands["syslog"].commands["rate-limit-container"],
+            ["bgp", "--interval", test_data['interval'], "--burst", test_data['burst']], obj=db
+        )
+
+        logger.debug("\n" + result.output)
+        logger.debug(result.exit_code)
+        print(result.output)
+        assert result.exit_code == SUCCESS
+
+        table = db.cfgdb.get_table(SYSLOG_CONFIG_FEATURE_TABLE)
+        assert 'bgp' in table
+        entry = table['bgp']
+        assert SYSLOG_RATE_LIMIT_INTERVAL in entry
+        assert SYSLOG_RATE_LIMIT_BURST in entry
+        assert entry[SYSLOG_RATE_LIMIT_INTERVAL] == test_data['expected_interval']
+        assert entry[SYSLOG_RATE_LIMIT_BURST] == test_data['expected_burst']
+
+    def test_config_syslog_rate_limit_container_invalid_service(self):
+        db = Db()
+        runner = CliRunner()
+
+        result = runner.invoke(
+            config.config.commands["syslog"].commands["rate-limit-container"],
+            ["invalid", "--interval", 1, "--burst", 100], obj=db
+        )
+
+        logger.debug("\n" + result.output)
+        logger.debug(result.exit_code)
+        assert result.exit_code != SUCCESS
+
+    def test_config_syslog_rate_limit_container_service_disabled(self):
+        db = Db()
+        db.cfgdb.set_entry(FEATURE_TABLE, 'bgp', {'support_syslog_rate_limit': 'true',
+                                                  'has_customized_syslog_rate_limit': 'false',
+                                                  'state': 'disabled'})
+        runner = CliRunner()
+
+        result = runner.invoke(
+            config.config.commands["syslog"].commands["rate-limit-container"],
+            ["bgp", "--interval", 1, "--burst", 100], obj=db
+        )
+
+        logger.debug("\n" + result.output)
+        logger.debug(result.exit_code)
+        assert result.exit_code != SUCCESS
+
+    def test_config_syslog_rate_limit_container_service_no_support(self):
+        db = Db()
+        db.cfgdb.set_entry(FEATURE_TABLE, 'bgp', {'support_syslog_rate_limit': 'false',
+                                                  'has_customized_syslog_rate_limit': 'false',
+                                                  'state': 'enabled'})
+        runner = CliRunner()
+
+        result = runner.invoke(
+            config.config.commands["syslog"].commands["rate-limit-container"],
+            ["bgp", "--interval", 1, "--burst", 100], obj=db
+        )
+
+        logger.debug("\n" + result.output)
+        logger.debug(result.exit_code)
+        assert result.exit_code != SUCCESS
+
     ########## SHOW SYSLOG ##########
 
     def test_show_syslog_empty(self):
@@ -242,3 +359,55 @@ class TestSyslog:
         logger.debug(result.exit_code)
         assert result.exit_code == SUCCESS
         assert result.output == assert_show_output.show_syslog
+
+    @pytest.mark.parametrize("test_data", [{'subcommand':'rate-limit-host', 'expected_output': assert_show_output.show_syslog_rate_limit_host},
+                                           {'subcommand':'rate-limit-container', 'expected_output': assert_show_output.show_syslog_rate_limit_container}])
+    def test_show_syslog_rate_limit(self, test_data):
+        dbconnector.dedicated_dbs["CONFIG_DB"] = os.path.join(mock_db_path, "syslog_rate_limit_db")
+
+        db = Db()
+        runner = CliRunner()
+
+        result = runner.invoke(
+            show.cli.commands["syslog"].commands[test_data['subcommand']], [], obj=db
+        )
+
+        logger.debug("\n" + result.output)
+        logger.debug(result.exit_code)
+        assert result.exit_code == SUCCESS
+        assert result.output == test_data['expected_output']
+
+    @pytest.mark.parametrize("test_data", [{'argument':'bgp', 'expected_output': assert_show_output.show_syslog_rate_limit_container_bgp},
+                                           {'argument':'swss', 'expected_output': assert_show_output.show_syslog_rate_limit_container_swss},
+                                           {'argument':'syncd', 'expected_output': assert_show_output.show_syslog_rate_limit_container_syncd}])
+    def test_show_syslog_rate_limit_container_per_service(self, test_data):
+        dbconnector.dedicated_dbs["CONFIG_DB"] = os.path.join(mock_db_path, "syslog_rate_limit_db")
+
+        db = Db()
+        runner = CliRunner()
+
+        result = runner.invoke(
+            show.cli.commands["syslog"].commands["rate-limit-container"], [test_data['argument']], obj=db
+        )
+
+        logger.debug("\n" + result.output)
+        logger.debug(result.exit_code)
+        assert result.exit_code == SUCCESS
+        assert result.output == test_data['expected_output']
+
+    @pytest.mark.parametrize("subcommand", ['invalid', # invalid service
+                                            'snmp',    # disabled service
+                                            'pmon'])   # not supported service
+    def test_show_syslog_rate_limit_container_negative(self, subcommand):
+        dbconnector.dedicated_dbs["CONFIG_DB"] = os.path.join(mock_db_path, "syslog_rate_limit_db")
+
+        db = Db()
+        runner = CliRunner()
+
+        result = runner.invoke(
+            show.cli.commands["syslog"].commands["rate-limit-container"], [subcommand], obj=db
+        )
+
+        logger.debug("\n" + result.output)
+        logger.debug(result.exit_code)
+        assert result.exit_code != SUCCESS
