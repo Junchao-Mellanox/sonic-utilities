@@ -45,6 +45,7 @@ from . import vxlan
 from . import plugins
 from .config_mgmt import ConfigMgmtDPB
 from . import mclag
+from . import syslog
 
 # mock masic APIs for unit test
 try:
@@ -1139,6 +1140,9 @@ config.add_command(mclag.mclag)
 config.add_command(mclag.mclag_member)
 config.add_command(mclag.mclag_unique_ip)
 
+# syslog module
+config.add_command(syslog.syslog)
+
 @config.command()
 @click.option('-y', '--yes', is_flag=True, callback=_abort_if_false,
                 expose_value=False, prompt='Existing files will be overwritten, continue?')
@@ -1692,7 +1696,7 @@ def load_minigraph(db, no_service_restart, traffic_shift_away):
                 cfggen_namespace_option = " -n {}".format(namespace)
             clicommon.run_command(db_migrator + ' -o set_version' + cfggen_namespace_option)
 
-    # Keep device isolated with TSA 
+    # Keep device isolated with TSA
     if traffic_shift_away:
         clicommon.run_command("TSA", display_cmd=True)
         if os.path.isfile(DEFAULT_GOLDEN_CONFIG_DB_FILE):
@@ -5959,57 +5963,6 @@ def enable(enable):
     command = "ztp enable"
     clicommon.run_command(command, display_cmd=True)
 
-#
-# 'syslog' group ('config syslog ...')
-#
-@config.group(cls=clicommon.AbbreviationGroup, name='syslog')
-@click.pass_context
-def syslog_group(ctx):
-    """Syslog server configuration tasks"""
-    config_db = ConfigDBConnector()
-    config_db.connect()
-    ctx.obj = {'db': config_db}
-
-@syslog_group.command('add')
-@click.argument('syslog_ip_address', metavar='<syslog_ip_address>', required=True)
-@click.pass_context
-def add_syslog_server(ctx, syslog_ip_address):
-    """ Add syslog server IP """
-    if not clicommon.is_ipaddress(syslog_ip_address):
-        ctx.fail('Invalid ip address')
-    db = ctx.obj['db']
-    syslog_servers = db.get_table("SYSLOG_SERVER")
-    if syslog_ip_address in syslog_servers:
-        click.echo("Syslog server {} is already configured".format(syslog_ip_address))
-        return
-    else:
-        db.set_entry('SYSLOG_SERVER', syslog_ip_address, {'NULL': 'NULL'})
-        click.echo("Syslog server {} added to configuration".format(syslog_ip_address))
-        try:
-            click.echo("Restarting rsyslog-config service...")
-            clicommon.run_command("systemctl restart rsyslog-config", display_cmd=False)
-        except SystemExit as e:
-            ctx.fail("Restart service rsyslog-config failed with error {}".format(e))
-
-@syslog_group.command('del')
-@click.argument('syslog_ip_address', metavar='<syslog_ip_address>', required=True)
-@click.pass_context
-def del_syslog_server(ctx, syslog_ip_address):
-    """ Delete syslog server IP """
-    if not clicommon.is_ipaddress(syslog_ip_address):
-        ctx.fail('Invalid IP address')
-    db = ctx.obj['db']
-    syslog_servers = db.get_table("SYSLOG_SERVER")
-    if syslog_ip_address in syslog_servers:
-        db.set_entry('SYSLOG_SERVER', '{}'.format(syslog_ip_address), None)
-        click.echo("Syslog server {} removed from configuration".format(syslog_ip_address))
-    else:
-        ctx.fail("Syslog server {} is not configured.".format(syslog_ip_address))
-    try:
-        click.echo("Restarting rsyslog-config service...")
-        clicommon.run_command("systemctl restart rsyslog-config", display_cmd=False)
-    except SystemExit as e:
-        ctx.fail("Restart service rsyslog-config failed with error {}".format(e))
 
 #
 # 'ntp' group ('config ntp ...')
