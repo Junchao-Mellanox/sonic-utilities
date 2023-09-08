@@ -821,6 +821,33 @@ def hexdump(indent, data, mem_address):
 
     return result
 
+
+# 'eeprom-hexdump-all' subcommand
+@show.command()
+def eeprom_hexdump_all():
+    """Display EEPROM hexdump of SFP transceiver(s) for all modules"""
+    lines = []
+
+    for index, sfp in enumerate(platform_chassis.get_all_sfps()):
+        try:
+            presence = sfp.get_presence()
+            if not presence:
+                lines.append(f'\nModuel {index + 1} not present')
+            else:
+                lines.append(f'\nEEPROM hexdump for module {index + 1}')
+                eeprom_data = sfp.dump_eeprom()
+                if eeprom_data is None:
+                    lines.append(f'        N/A\n')
+                else:
+                    lines.append(eeprom_data)
+        except NotImplementedError:
+            lines.append(f'\nModuel {index + 1} not supported')
+        except Exception as e:
+            lines.append(f'\nModuel {index + 1} get EEPROM failed: {e}')
+
+    click.echo('\n'.join(lines))
+
+
 # 'presence' subcommand
 @show.command()
 @click.option('-p', '--port', metavar='<port_name>', help="Display SFP presence for port <port_name> only")
@@ -1281,10 +1308,10 @@ def is_fw_switch_done(port_name):
                 status = -1 # Abnormal status.
             elif (ImageARunning == 1) and (ImageACommitted == 0):   # ImageA is running, but not committed.
                 click.echo("FW images switch successful : ImageA is running")
-                status = 1  # run_firmware is done. 
+                status = 1  # run_firmware is done.
             elif (ImageBRunning == 1) and (ImageBCommitted == 0):   # ImageB is running, but not committed.
                 click.echo("FW images switch successful : ImageB is running")
-                status = 1  # run_firmware is done. 
+                status = 1  # run_firmware is done.
             else:                                                   # No image is running, or running and committed image is same.
                 click.echo("FW info error : Failed to switch into uncommitted image!")
                 status = -1 # Failure for Switching images.
