@@ -399,3 +399,31 @@ class TestSyslog:
         logger.debug("\n" + result.output)
         logger.debug(result.exit_code)
         assert result.exit_code != SUCCESS
+
+    @mock.patch('config.syslog.clicommon.run_command')
+    def test_enable_syslog_rate_limit_feature(self, mock_run):
+        db = Db()
+        db.cfgdb.set_entry(FEATURE_TABLE, 'bgp', {SUPPORT_RATE_LIMIT: 'true',
+                                                  'state': 'enabled'})
+
+        runner = CliRunner()
+
+        mock_run.return_value = ('', 0)
+        result = runner.invoke(
+            config.config.commands["syslog"].commands["rate-limit-feature"].commands["enable"]
+        )
+        assert result.exit_code == SUCCESS
+        
+    @mock.patch('config.syslog.clicommon.run_command')
+    def test_disable_syslog_rate_limit_feature(self, mock_run):
+        db = Db()
+        db.cfgdb.set_entry(FEATURE_TABLE, 'bgp', {SUPPORT_RATE_LIMIT: 'true',
+                                                  'state': 'enabled'})
+
+        runner = CliRunner()
+
+        mock_run.return_value = ('', 0)
+        result = runner.invoke(
+            config.config.commands["syslog"].commands["rate-limit-feature"].commands["disable"]
+        )
+        assert result.exit_code == SUCCESS
