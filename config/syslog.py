@@ -642,3 +642,52 @@ def disable_rate_limit_feature(db, service_name, namespace):
         
         if not failed:
             click.echo(f'Disabled syslog rate limit feature for {feature_name}')
+
+
+@syslog.command('level')
+@click.option("-c", "--component",
+              required=True,
+              help="Component name in DB for which loglevel is applied (provided with -l)")
+@click.option("-l", "--level",
+              required=True,
+              help="Loglevel value",
+              type=click.Choice(['DEBUG', 'INFO', 'NOTICE', 'WARN', 'ERROR']))
+@click.option("--service",
+              help="Container name to which the SIGHUP is sent (provided with --pid or --program)")
+@click.option("--program",
+              help="Program name to which the SIGHUP is sent (provided with --service)")
+@click.option("--pid",
+              help="Process ID to which the SIGHUP is sent (provided with --service if PID is from container)")
+@clicommon.pass_db
+def level(db, component, level, service, program, pid):
+    """ Configure log level """
+    if program and not service:
+        raise click.UsageError('--program must be specified with --service')
+
+    if service and not program and not pid:
+        raise click.UsageError('--service must be specified with --pid or --program')
+
+    if component and level:
+        output, ret = clicommon.run_command(['swssloglevel', '-c', component, '-l', level], return_cmd=True)
+        if ret != 0:
+            raise click.ClickException(f'Failed: {output}')
+
+    if not service and not program and not pid:
+        return
+
+    log_config = db.cfgdb.get_entry('LOGGER', component)
+    require_manual_refresh = log_config.get('require_manual_refresh')
+    if not require_manual_refresh:
+        click.echo(f'Log {component} does not need manual refresh')
+        return
+
+    if service:
+        if program:
+            command = ['docker', 'exec', '-i', service, 'supervisorctl', 'signal', 'HUP', program]
+        else:
+            command = ['docker', 'exec', '-i', service, 'kill', '-s', 'SIGHUP', pid]
+    else:
+        command = ['kill', '-s', 'SIGHUP', pid]
+    output, ret = clicommon.run_command(command, return_cmd=True)
+    if ret != 0:
+        raise click.ClickException(f'Failed: {output}')
