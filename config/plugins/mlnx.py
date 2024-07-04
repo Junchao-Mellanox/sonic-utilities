@@ -23,6 +23,7 @@
 #
 
 try:
+    import json
     import os
     import time
 
@@ -235,6 +236,79 @@ def sdk_sniffer_disable():
     else:
         pass
 
+
+@mlnx.group()
+def im():
+    """ Utility for managing Mellanox module host management mode """
+    pass
+
+
+@im.command()
+def enabled():
+    """ Enable module host management mode"""
+    platform_dir, hwsku_dir = device_info.get_paths_to_platform_and_hwsku_dirs()
+    sai_profile = os.path.join(hwsku_dir, 'sai.profile')
+    from sonic_platform.device_data import DeviceDataManager
+    if DeviceDataManager.is_module_host_management_mode():
+        click.echo('Module host management mode is already enabled')
+        return 0
+    
+    with open(sai_profile, 'a') as f:
+        f.write('SAI_INDEPENDENT_MODULE_MODE=1\n')
+        
+    control_file = os.path.join(platform_dir, 'pmon_daemon_control.json')
+    with open(control_file, 'r') as f:
+        content = json.load(f)
+        
+    control_file = os.path.join(hwsku_dir, 'pmon_daemon_control.json')
+    with open(control_file, 'w') as f:
+        content['skip_xcvrd_cmis_mgr'] = 'false'
+        content['enable_xcvrd_sff_mgr'] = 'true'
+        json.dump(content, f)
+        
+    src = '/usr/share/sonic/device/x86_64-mlnx_msn4700-r0/Mellanox-SN4700-O8C48/media_settings.json'
+    if not os.path.exists(src):
+        src = '/usr/share/sonic/device/x86_64-mlnx_msn4700-r0/Mellanox-SN4700-O8V48/media_settings.json'
+    dst = os.path.join(hwsku_dir, 'media_settings.json')
+    clicommon.run_command(['cp', src, dst])
+    
+    src = '/usr/share/sonic/device/x86_64-mlnx_msn4700-r0/Mellanox-SN4700-O8C48/optics_si_settings.json'
+    if not os.path.exists(src):
+        src = '/usr/share/sonic/device/x86_64-mlnx_msn4700-r0/Mellanox-SN4700-O8V48/optics_si_settings.json'
+    dst = os.path.join(hwsku_dir, 'optics_si_settings.json')
+    clicommon.run_command(['cp', src, dst])
+
+
+@im.command()
+def disabled():
+    """ Disable module host management mode"""
+    _, hwsku_dir = device_info.get_paths_to_platform_and_hwsku_dirs()
+    sai_profile = os.path.join(hwsku_dir, 'sai.profile')
+    from sonic_platform.device_data import DeviceDataManager
+    if not DeviceDataManager.is_module_host_management_mode():
+        click.echo('Module host management mode is already disabled')
+        return 0
+    
+    with open(sai_profile, 'r') as f:
+        lines = f.readlines()
+        new_lines = []
+        for line in lines:
+            if line.find('SAI_INDEPENDENT_MODULE_MODE') != -1:
+                continue
+            new_lines.append(line)
+            
+    with open(sai_profile, 'w') as f:
+        f.writelines(new_lines)
+        
+    control_file = os.path.join(hwsku_dir, 'pmon_daemon_control.json')
+    clicommon.run_command(['rm', '-f', control_file])
+    
+    file_path = os.path.join(hwsku_dir, 'media_settings.json')
+    clicommon.run_command(['rm', '-f', file_path])
+    
+    file_path = os.path.join(hwsku_dir, 'optics_si_settings.json')
+    clicommon.run_command(['rm', '-f', file_path])
+    
 
 # place holders for 'sniff prm enable/disable' and 'sniffer all enable/disable'
 # @sniffer.command()
