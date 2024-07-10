@@ -262,8 +262,8 @@ def enabled():
         
     control_file = os.path.join(hwsku_dir, 'pmon_daemon_control.json')
     with open(control_file, 'w') as f:
-        content['skip_xcvrd_cmis_mgr'] = 'false'
-        content['enable_xcvrd_sff_mgr'] = 'true'
+        content['skip_xcvrd_cmis_mgr'] = False
+        content['enable_xcvrd_sff_mgr'] = True
         json.dump(content, f)
         
     src = '/usr/share/sonic/device/x86_64-mlnx_msn4700-r0/Mellanox-SN4700-O8C48/media_settings.json'
